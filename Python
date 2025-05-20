@@ -1,0 +1,85 @@
+import numpy as np
+import time
+import tracemalloc
+
+# Algoritmo Naive
+def naive_multiply(A, B):
+    n = len(A)
+    C = [[0]*n for _ in range(n)]
+    for i in range(n):
+        for j in range(n):
+            for k in range(n):
+                C[i][j] += A[i][k] * B[k][j]
+    return C
+
+# Algoritmo Strassen
+def sum_matrix(A, B):
+    n = len(A)
+    return [[A[i][j] + B[i][j] for j in range(n)] for i in range(n)]
+
+def sub_matrix(A, B):
+    n = len(A)
+    return [[A[i][j] - B[i][j] for j in range(n)] for i in range(n)]
+
+def split_matrix(M):
+    n = len(M)
+    mid = n // 2
+    A11 = [row[:mid] for row in M[:mid]]
+    A12 = [row[mid:] for row in M[:mid]]
+    A21 = [row[:mid] for row in M[mid:]]
+    A22 = [row[mid:] for row in M[mid:]]
+    return A11, A12, A21, A22
+
+def join_matrix(A11, A12, A21, A22):
+    top = [a + b for a, b in zip(A11, A12)]
+    bottom = [a + b for a, b in zip(A21, A22)]
+    return top + bottom
+
+def strassen(A, B):
+    n = len(A)
+    if n == 1:
+        return [[A[0][0] * B[0][0]]]
+    else:
+        A11, A12, A21, A22 = split_matrix(A)
+        B11, B12, B21, B22 = split_matrix(B)
+
+        M1 = strassen(sum_matrix(A11, A22), sum_matrix(B11, B22))
+        M2 = strassen(sum_matrix(A21, A22), B11)
+        M3 = strassen(A11, sub_matrix(B12, B22))
+        M4 = strassen(A22, sub_matrix(B21, B11))
+        M5 = strassen(sum_matrix(A11, A12), B22)
+        M6 = strassen(sub_matrix(A21, A11), sum_matrix(B11, B12))
+        M7 = strassen(sub_matrix(A12, A22), sum_matrix(B21, B22))
+
+        C11 = sum_matrix(sub_matrix(sum_matrix(M1, M4), M5), M7)
+        C12 = sum_matrix(M3, M5)
+        C21 = sum_matrix(M2, M4)
+        C22 = sum_matrix(sub_matrix(sum_matrix(M1, M3), M2), M6)
+
+        return join_matrix(C11, C12, C21, C22)
+
+def medir_tiempo_memoria(funcion, A, B):
+    tracemalloc.start()
+    start = time.time()
+    funcion(A, B)
+    end = time.time()
+    memoria = tracemalloc.get_traced_memory()[1] / (1024 * 1024)  # en MB
+    tracemalloc.stop()
+    return round(end - start, 4), round(memoria, 2)
+
+n = 512  # Cambia este valor a 128, 256, 1024
+
+print(f"\n--- Matriz {n}x{n} ---")
+A = np.random.randint(0, 10, (n, n)).tolist()
+B = np.random.randint(0, 10, (n, n)).tolist()
+
+# Prueba Naive
+tiempo_naive, memoria_naive = medir_tiempo_memoria(naive_multiply, A, B)
+print(f"Naive ({n}x{n}) - Tiempo: {tiempo_naive}s, Memoria: {memoria_naive}MB")
+
+# Prueba Strassen 
+if n <= 256:
+    tiempo_strassen, memoria_strassen = medir_tiempo_memoria(strassen, A, B)
+    print(f"Strassen ({n}x{n}) - Tiempo: {tiempo_strassen}s, Memoria: {memoria_strassen}MB")
+else:
+    print(f"Strassen ({n}x{n}) - No probado (muy lento en Python puro)")
