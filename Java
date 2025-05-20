@@ -1,6 +1,8 @@
+package Matrices;
+
 import java.util.Random;
 
-public class MatrixBenchmark {
+public class Matriz {
 
     // Generar matriz aleatoria
     public static double[][] generateRandomMatrix(int n) {
@@ -137,3 +139,5 @@ public class MatrixBenchmark {
         }
     }
 }
+
+
