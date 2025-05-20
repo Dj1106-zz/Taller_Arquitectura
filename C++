@@ -1,0 +1,125 @@
+#include <iostream>
+#include <vector>
+#include <chrono>
+#include <cstdlib>
+#include <ctime>
+
+using namespace std;
+using namespace std::chrono;
+
+typedef vector<vector<int>> Matrix;
+
+Matrix generar_matriz(int n) {
+    Matrix M(n, vector<int>(n));
+    for (int i = 0; i < n; ++i)
+        for (int j = 0; j < n; ++j)
+            M[i][j] = rand() % 10;
+    return M;
+}
+
+Matrix naive_multiply(const Matrix &A, const Matrix &B) {
+    int n = A.size();
+    Matrix C(n, vector<int>(n, 0));
+    for (int i = 0; i < n; ++i)
+        for (int j = 0; j < n; ++j)
+            for (int k = 0; k < n; ++k)
+                C[i][j] += A[i][k] * B[k][j];
+    return C;
+}
+
+Matrix sum_matrix(const Matrix &A, const Matrix &B) {
+    int n = A.size();
+    Matrix C(n, vector<int>(n));
+    for (int i = 0; i < n; ++i)
+        for (int j = 0; j < n; ++j)
+            C[i][j] = A[i][j] + B[i][j];
+    return C;
+}
+
+Matrix sub_matrix(const Matrix &A, const Matrix &B) {
+    int n = A.size();
+    Matrix C(n, vector<int>(n));
+    for (int i = 0; i < n; ++i)
+        for (int j = 0; j < n; ++j)
+            C[i][j] = A[i][j] - B[i][j];
+    return C;
+}
+
+void split_matrix(const Matrix &M, Matrix &A11, Matrix &A12, Matrix &A21, Matrix &A22) {
+    int n = M.size();
+    int mid = n / 2;
+    A11 = A12 = A21 = A22 = Matrix(mid, vector<int>(mid));
+    for (int i = 0; i < mid; ++i)
+        for (int j = 0; j < mid; ++j) {
+            A11[i][j] = M[i][j];
+            A12[i][j] = M[i][j + mid];
+            A21[i][j] = M[i + mid][j];
+            A22[i][j] = M[i + mid][j + mid];
+        }
+}
+
+Matrix join_matrix(const Matrix &C11, const Matrix &C12, const Matrix &C21, const Matrix &C22) {
+    int mid = C11.size();
+    int n = mid * 2;
+    Matrix C(n, vector<int>(n));
+    for (int i = 0; i < mid; ++i)
+        for (int j = 0; j < mid; ++j) {
+            C[i][j] = C11[i][j];
+            C[i][j + mid] = C12[i][j];
+            C[i + mid][j] = C21[i][j];
+            C[i + mid][j + mid] = C22[i][j];
+        }
+    return C;
+}
+
+Matrix strassen(const Matrix &A, const Matrix &B) {
+    int n = A.size();
+    if (n == 1) {
+        return {{A[0][0] * B[0][0]}};
+    } else {
+        Matrix A11, A12, A21, A22;
+        Matrix B11, B12, B21, B22;
+
+        split_matrix(A, A11, A12, A21, A22);
+        split_matrix(B, B11, B12, B21, B22);
+
+        Matrix M1 = strassen(sum_matrix(A11, A22), sum_matrix(B11, B22));
+        Matrix M2 = strassen(sum_matrix(A21, A22), B11);
+        Matrix M3 = strassen(A11, sub_matrix(B12, B22));
+        Matrix M4 = strassen(A22, sub_matrix(B21, B11));
+        Matrix M5 = strassen(sum_matrix(A11, A12), B22);
+        Matrix M6 = strassen(sub_matrix(A21, A11), sum_matrix(B11, B12));
+        Matrix M7 = strassen(sub_matrix(A12, A22), sum_matrix(B21, B22));
+
+        Matrix C11 = sum_matrix(sub_matrix(sum_matrix(M1, M4), M5), M7);
+        Matrix C12 = sum_matrix(M3, M5);
+        Matrix C21 = sum_matrix(M2, M4);
+        Matrix C22 = sum_matrix(sub_matrix(sum_matrix(M1, M3), M2), M6);
+
+        return join_matrix(C11, C12, C21, C22);
+    }
+}
+
+void medir_tiempo_y_memoria(const string &nombre, Matrix (*func)(const Matrix &, const Matrix &),
+                             const Matrix &A, const Matrix &B, int n, int numMatrices) {
+    auto start = high_resolution_clock::now();
+    Matrix C = func(A, B);
+    auto end = high_resolution_clock::now();
+    double tiempo_s = duration_cast<milliseconds>(end - start).count() / 1000.0;
+    double memoria_MB = (n * n * sizeof(int) * numMatrices) / (1024.0 * 1024.0);
+
+    cout << nombre << " -> Tiempo: " << tiempo_s << "s | Memoria estimada: " << memoria_MB << " MB" << endl;
+}
+
+int main() {
+    srand(time(0));
+    int n = 64;  // Puedes cambiarlo por 128, 256, etc.
+
+    Matrix A = generar_matriz(n);
+    Matrix B = generar_matriz(n);
+
+    medir_tiempo_y_memoria("Naive", naive_multiply, A, B, n, 3);
+    medir_tiempo_y_memoria("Strassen", strassen, A, B, n, 12);
+
+    return 0;
+}
