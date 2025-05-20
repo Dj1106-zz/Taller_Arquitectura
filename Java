@@ -1,0 +1,139 @@
+import java.util.Random;
+
+public class MatrixBenchmark {
+
+    // Generar matriz aleatoria
+    public static double[][] generateRandomMatrix(int n) {
+        Random rand = new Random();
+        double[][] matrix = new double[n][n];
+        for (int i = 0; i < n; i++)
+            for (int j = 0; j < n; j++)
+                matrix[i][j] = rand.nextDouble() * 10;
+        return matrix;
+    }
+
+    // Algoritmo ingenuo (triple bucle)
+    public static double[][] naiveMultiply(double[][] A, double[][] B) {
+        int n = A.length;
+        double[][] C = new double[n][n];
+        for (int i = 0; i < n; i++)
+            for (int j = 0; j < n; j++)
+                for (int k = 0; k < n; k++)
+                    C[i][j] += A[i][k] * B[k][j];
+        return C;
+    }
+
+    // Suma y resta de matrices (para Strassen)
+    public static double[][] add(double[][] A, double[][] B) {
+        int n = A.length;
+        double[][] result = new double[n][n];
+        for (int i = 0; i < n; i++)
+            for (int j = 0; j < n; j++)
+                result[i][j] = A[i][j] + B[i][j];
+        return result;
+    }
+
+    public static double[][] subtract(double[][] A, double[][] B) {
+        int n = A.length;
+        double[][] result = new double[n][n];
+        for (int i = 0; i < n; i++)
+            for (int j = 0; j < n; j++)
+                result[i][j] = A[i][j] - B[i][j];
+        return result;
+    }
+
+    // Algoritmo de Strassen con corte base
+    public static double[][] strassenMultiply(double[][] A, double[][] B) {
+        int n = A.length;
+
+        // Corte base: usar naive para tamaños pequeños
+        if (n <= 64) {
+            return naiveMultiply(A, B);
+        }
+
+        int newSize = n / 2;
+        double[][] a11 = new double[newSize][newSize];
+        double[][] a12 = new double[newSize][newSize];
+        double[][] a21 = new double[newSize][newSize];
+        double[][] a22 = new double[newSize][newSize];
+        double[][] b11 = new double[newSize][newSize];
+        double[][] b12 = new double[newSize][newSize];
+        double[][] b21 = new double[newSize][newSize];
+        double[][] b22 = new double[newSize][newSize];
+
+        // Dividir matrices
+        for (int i = 0; i < newSize; i++) {
+            for (int j = 0; j < newSize; j++) {
+                a11[i][j] = A[i][j];
+                a12[i][j] = A[i][j + newSize];
+                a21[i][j] = A[i + newSize][j];
+                a22[i][j] = A[i + newSize][j + newSize];
+
+                b11[i][j] = B[i][j];
+                b12[i][j] = B[i][j + newSize];
+                b21[i][j] = B[i + newSize][j];
+                b22[i][j] = B[i + newSize][j + newSize];
+            }
+        }
+
+        // 7 productos de Strassen
+        double[][] M1 = strassenMultiply(add(a11, a22), add(b11, b22));
+        double[][] M2 = strassenMultiply(add(a21, a22), b11);
+        double[][] M3 = strassenMultiply(a11, subtract(b12, b22));
+        double[][] M4 = strassenMultiply(a22, subtract(b21, b11));
+        double[][] M5 = strassenMultiply(add(a11, a12), b22);
+        double[][] M6 = strassenMultiply(subtract(a21, a11), add(b11, b12));
+        double[][] M7 = strassenMultiply(subtract(a12, a22), add(b21, b22));
+
+        // Combinar resultados
+        double[][] c11 = add(subtract(add(M1, M4), M5), M7);
+        double[][] c12 = add(M3, M5);
+        double[][] c21 = add(M2, M4);
+        double[][] c22 = add(subtract(add(M1, M3), M2), M6);
+
+        double[][] C = new double[n][n];
+        for (int i = 0; i < newSize; i++) {
+            for (int j = 0; j < newSize; j++) {
+                C[i][j] = c11[i][j];
+                C[i][j + newSize] = c12[i][j];
+                C[i + newSize][j] = c21[i][j];
+                C[i + newSize][j + newSize] = c22[i][j];
+            }
+        }
+
+        return C;
+    }
+
+    // Función principal con tabla de resultados
+    public static void main(String[] args) {
+        int[] sizes = {128, 256, 512, 1024};
+
+        System.out.printf("%-8s %-20s %-20s %-20s %-20s%n", "Tamaño", "Tiempo Naive (ms)", "Tiempo Strassen (ms)", "Memoria Naive (MB)", "Memoria Strassen (MB)");
+        System.out.println("---------------------------------------------------------------------------------------------");
+
+        for (int n : sizes) {
+            double[][] A = generateRandomMatrix(n);
+            double[][] B = generateRandomMatrix(n);
+
+            // Tiempo Naive
+            long startNaive = System.nanoTime();
+            double[][] naiveResult = naiveMultiply(A, B);
+            long endNaive = System.nanoTime();
+            double timeNaive = (endNaive - startNaive) / 1_000_000.0;
+
+            // Tiempo Strassen
+            long startStrassen = System.nanoTime();
+            double[][] strassenResult = strassenMultiply(A, B);
+            long endStrassen = System.nanoTime();
+            double timeStrassen = (endStrassen - startStrassen) / 1_000_000.0;
+
+            // Estimación de memoria
+            int n2 = n * n;
+            double memNaive = 3 * n2 * 8.0 / (1024 * 1024);      // A, B, C
+            double memStrassen = 12 * n2 * 8.0 / (1024 * 1024);   // Aprox. por submatrices
+
+            // Mostrar resultados
+            System.out.printf("%-8d %-20.2f %-20.2f %-20.2f %-20.2f%n", n, timeNaive, timeStrassen, memNaive, memStrassen);
+        }
+    }
+}
